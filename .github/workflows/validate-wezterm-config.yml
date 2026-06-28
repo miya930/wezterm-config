@@ -18,6 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: install.sh の検証
+        run: |
+          bash -n install.sh
+          if command -v shellcheck >/dev/null; then
+            shellcheck --severity=error install.sh
+          fi
+
       - name: Lua 構文チェック
         run: |
           sudo apt-get update
