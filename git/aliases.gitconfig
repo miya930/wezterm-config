@@ -1,0 +1,10 @@
+[alias]
+	co = checkout
+	st = status
+	br = branch
+	cob = checkout -b
+	lg = log --oneline --graph --decorate --all
+	last = log -1 HEAD --stat
+	unstage = reset HEAD --
+	dc = diff --cached
+	aliases = config --get-regexp ^alias
