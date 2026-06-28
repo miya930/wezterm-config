@@ -59,10 +59,19 @@ local ACTIVE_FG = '#0b0b0b'
 local INACTIVE_BG = '#3a3f4b'
 local INACTIVE_FG = '#cfd2d6'
 
+-- パス等から末尾要素（ファイル/フォルダ/プロセス名）を取り出す
+local function basename(s)
+  if not s then return nil end
+  return (s:gsub('[/\\]+$', '')):match('([^/\\]+)$')
+end
+
 wezterm.on('format-tab-title', function(tab, tabs, panes, conf, hover, max_width)
   local bg = tab.is_active and ACTIVE_BG or INACTIVE_BG
   local fg = tab.is_active and ACTIVE_FG or INACTIVE_FG
-  local title = ' ' .. (tab.tab_index + 1) .. ': ' .. tab.active_pane.title .. ' '
+  -- シェル側で「実行中コマンド／待機中は bash」をタイトルに設定済み（cwd は出さない）
+  local pane_title = tab.active_pane.title
+  if pane_title == nil or pane_title == '' then pane_title = 'shell' end
+  local title = ' ' .. (tab.tab_index + 1) .. ': ' .. pane_title .. ' '
   title = wezterm.truncate_right(title, max_width - 2)
   return {
     { Background = { Color = bg } },
@@ -75,11 +84,6 @@ wezterm.on('format-tab-title', function(tab, tabs, panes, conf, hover, max_width
 end)
 
 -- ③ 右上ステータス（実用情報を Powerline 風に表示。値が無い項目は省略）
-local function basename(s)
-  if not s then return nil end
-  return (s:gsub('[/\\]+$', '')):match('([^/\\]+)$')
-end
-
 wezterm.on('update-right-status', function(window, pane)
   local segments = {}
 
