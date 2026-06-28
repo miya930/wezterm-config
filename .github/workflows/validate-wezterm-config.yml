@@ -1,0 +1,61 @@
+name: validate-wezterm-config
+
+# 壊れた .wezterm.lua を main に入れないための検証。
+# 必須チェックにするため paths フィルタは付けず、全 PR / main push で必ず走らせる
+# （実行しないと「必須チェック未報告」で無関係な PR まで止まるため）。
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lua 構文チェック
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+          luac5.4 -p .wezterm.lua
+
+      - name: WezTerm を導入
+        run: |
+          curl -fsSL https://apt.fury.io/wez/gpg.key \
+            | sudo gpg --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
+            | sudo tee /etc/apt/sources.list.d/wezterm.list
+          sudo apt-get update
+          sudo apt-get install -y wezterm
+
+      - name: 設定スキーマ検証
+        run: |
+          set -uo pipefail
+          export WEZTERM_LOG=info
+          # ls-fonts は Lua→Config 変換を実行し、不正フィールド/値を ERROR に出す
+          # （show-keys では出ない）。フォント未導入の警告とは文言が違うので限定 grep する。
+          out=$(wezterm --config-file ./.wezterm.lua ls-fonts 2>&1 || true)
+          if echo "$out" | grep -E "is not a valid (Config field|value)|error converting Lua table to Config"; then
+            echo "::error::.wezterm.lua の設定にスキーマエラーがあります"
+            exit 1
+          fi
+          echo "OK: 設定スキーマは妥当です"
+
+      - name: 自己テスト（壊した設定を検出できることを確認）
+        run: |
+          set -uo pipefail
+          export WEZTERM_LOG=info
+          cp .wezterm.lua /tmp/broken.lua
+          sed -i 's/config.color_scheme =/config.color_schema =/' /tmp/broken.lua
+          out=$(wezterm --config-file /tmp/broken.lua ls-fonts 2>&1 || true)
+          if echo "$out" | grep -E "is not a valid (Config field|value)|error converting Lua table to Config"; then
+            echo "OK: 壊れた設定を検出できた（検出ロジック健在）"
+          else
+            echo "::error::検出ロジックが壊れています（壊れた設定を見逃した）"
+            exit 1
+          fi
